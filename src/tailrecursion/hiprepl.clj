@@ -4,7 +4,6 @@
   (:import
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
    [org.jivesoftware.smack.packet Message Presence Presence$Type]
-   [org.jivesoftware.smack.filter MessageTypeFilter]
    [org.jivesoftware.smackx.muc MultiUserChat]))
 
 (def available-presence (Presence. Presence$Type/available))
