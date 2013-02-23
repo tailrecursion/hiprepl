@@ -1,96 +1,77 @@
 (ns tailrecursion.hiprepl
-  (:require [clojure.data.json :as json]
-            [clj-http.client   :as client]
-            [clojure.set       :refer [difference]]
-            [overtone.at-at    :refer [mk-pool every]]
-            [clojail.core      :refer [sandbox safe-read]]
-            [clojail.testers   :refer [secure-tester]]))
+  (:require [clojail.core      :refer [sandbox safe-read]]
+            [clojail.testers   :refer [secure-tester]])
+  (:import
+   [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
+   [org.jivesoftware.smack.packet Message Presence Presence$Type]
+   [org.jivesoftware.smack.filter MessageTypeFilter]
+   [org.jivesoftware.smackx.muc MultiUserChat]))
 
-(def api-url "http://api.hipchat.com/v1")
+(def available-presence (Presence. Presence$Type/available))
 
-(defn rooms*
-  [token]
-  (let [query {:auth_token token :format "json"}]
-    (-> (client/get (str api-url "/rooms/list") {:query-params query})
-        :body
-        json/read-str
-        (get "rooms"))))
+(defn packet-listener [conn processor]
+  (proxy
+      [PacketListener]
+      []
+    (processPacket [packet] (processor conn packet))))
 
-(def rooms (memoize rooms*))
+(defn error->map [e]
+  (if (nil? e)
+    nil
+    {:code (.getCode e) :message (.getMessage e)}))
 
-(defn room-id*
-  [token room-name]
-  (let [rooms (rooms token)]
-    (get (first (filter #(= room-name (get % "name")) rooms)) "room_id")))
+(defn message->map [#^Message m]
+  (try
+   {:body (.getBody m)}
+   (catch Exception e (println e) {})))
 
-(def room-id (memoize room-id*))
+(defn with-message-map [handler]
+  (fn [muc packet]
+    (let [message (message->map #^Message packet)]
+      (try
+       (handler muc message)
+       (catch Exception e (println e))))))
 
-(defn fetch-recent
-  [token room-name]
-  (let [query {:room_id (room-id token room-name)
-               :auth_token token
-               :date "recent"
-               :format "json"}]
-    (-> (client/get (str api-url "/rooms/history") {:query-params query})
-        :body
-        json/read-str
-        (get "messages")
-        set)))
+(defn wrap-responder [handler]
+  (fn [muc message]
+    (if-let [resp (handler message)]
+      (.sendMessage muc resp))))
 
-(defn user-info*
-  [token user-id]
-  (let [query {:user_id user-id
-               :auth_token token}]
-    (-> (client/get (str api-url "/users/show") {:query-params query})
-        :body
-        json/read-str
-        (get "user"))))
+(defn connect
+  [username password]
+  (let [conn (XMPPConnection. (ConnectionConfiguration. "chat.hipchat.com" 5222))]
+    (.connect conn)
+    (try
+      (.login conn username password)
+      (catch XMPPException e
+        (throw (Exception. "Couldn't log in with user's credentials."))))
+    (.sendPacket conn available-presence)
+    conn))
 
-(def user-info (memoize user-info*))
-
-(defn send-result
-  [token room-name msg]
-  (let [query {:room_id (room-id token room-name)
-               :from (str "Clojure " (clojure-version))
-               :message msg
-               :notify 1
-               :auth_token token
-               :format "json"}]
-    (-> (client/get (str api-url "/rooms/message") {:query-params query})
-        :body
-        json/read-str)))
+(defn join
+  [conn room room-nickname handler]
+  (let [muc (MultiUserChat. conn (str room "@conf.hipchat.com"))]
+    (.join muc room-nickname)
+    (.addMessageListener muc
+                         (packet-listener muc (with-message-map (wrap-responder handler))))
+    conn))
 
 (def secure-sandbox (sandbox secure-tester))
 
-(defn eval-messages
-  [token room-name messages]
-  (doseq [{:strs [message from]} messages
-          :when (.startsWith message ",")
-          :let [code-str (.substring message 1)
-                return (try
-                         (binding [*print-length* 30]
-                           (pr-str (secure-sandbox (safe-read code-str))))
-                         (catch Throwable t
-                           (.getMessage t)))
-                mention (get (user-info token (get from "user_id")) "mention_name")]]
-    (println (format "%s ran %s, got %s\t%s" mention code-str return (java.util.Date.)))
-    (future (send-result token room-name (format "@%s %s" mention return)))))
+(defn eval-handler
+  [{:keys [body] :as msg}]
+  (when (.startsWith body ",")
+    (try
+      (binding [*print-length* 30]
+        (pr-str (secure-sandbox (safe-read (.substring body 1)))))
+      (catch Throwable t
+        (.getMessage t)))))
 
 (defn -main
-  [auth-token room-name]
-  (let [messages (agent {:prev (fetch-recent auth-token room-name)
-                         :eval #{}})
-        pool (mk-pool)]
-    (add-watch messages ::eval #(eval-messages auth-token room-name (:eval %4)))
-    (every 7000
-           #(do
-              (println "Polling...\t" (java.util.Date.))
-              (send-off messages (fn [{:keys [prev] :as old}]
-                                   (try
-                                     (let [new (fetch-recent auth-token room-name)]
-                                       {:prev new
-                                        :eval (difference new prev)})
-                                     (catch Throwable t
-                                       (println "Error" (.getMessage t) (java.util.Date.))
-                                       old)))))
-           pool)))
+  [config-path]
+  (let [{:keys [username password rooms room-nickname]} (binding [*read-eval* false]
+                                                          (read-string (slurp config-path)))
+        conn (connect username password)]
+    (doseq [room rooms]
+      (join conn room room-nickname eval-handler))
+    @(promise)))
