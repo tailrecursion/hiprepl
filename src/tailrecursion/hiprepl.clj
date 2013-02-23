@@ -1,4 +1,4 @@
-(ns hiprepl.core
+(ns tailrecursion.hiprepl
   (:require [clojure.data.json :as json]
             [clj-http.client :as client]
             [clojure.set :as s]
@@ -48,11 +48,12 @@
 
 (def user-info (memoize user-info*))
 
-(defn send-message
+(defn send-result
   [token room-name msg]
   (let [query {:room_id (room-id token room-name)
                :from (str "Clojure " (clojure-version))
                :message msg
+               :notify 1
                :auth_token token
                :format "json"}]
     (-> (client/get (str api-url "/rooms/message") {:query-params query})
@@ -63,16 +64,18 @@
 
 (defn eval-messages
   [token room-name messages]
-  (println "Evaluating messages.")
   (doseq [{:strs [message from]} messages
           :when (.startsWith message ",")
-          :let [code (safe-read (.substring message 1))
-                return (binding [*print-length* 30]
-                         (pr-str (try (secure-sandbox code)
-                                      (catch Throwable t (.getMessage t)))))
+          :let [code-str (.substring message 1)
+                return (try
+                         (binding [*print-length* 30]
+                           (let [result (secure-sandbox (safe-read code-str))]
+                             (pr-str result)))
+                         (catch Throwable t
+                           (.getMessage t)))
                 mention (get (user-info token (get from "user_id")) "mention_name")]]
-    (println (format "%s ran %s, got %s" mention (pr-str code) return))
-    (future (send-message token room-name (format "@%s %s" mention return)))))
+    (println (format "%s ran %s, got %s" mention code-str return))
+    (future (send-result token room-name (format "@%s %s" mention return)))))
 
 (defn -main
   [auth-token room-name]
@@ -80,11 +83,9 @@
                          :eval #{}})
         pool (mk-pool)]
     (add-watch messages ::eval #(eval-messages auth-token room-name (:eval %4)))
-    (every 4000
-           (fn []
-             (println "Polling...")
-             (send-off messages (fn [{:keys [prev]}]
-                                  (let [new (fetch-recent auth-token room-name)]
-                                    {:prev new
-                                     :eval (s/difference new prev)}))))
+    (every 7000
+           #(send-off messages (fn [{:keys [prev]}]
+                                 (let [new (fetch-recent auth-token room-name)]
+                                   {:prev new
+                                    :eval (s/difference new prev)})))
            pool)))
