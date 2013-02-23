@@ -14,11 +14,6 @@
       []
     (processPacket [packet] (processor conn packet))))
 
-(defn error->map [e]
-  (if (nil? e)
-    nil
-    {:code (.getCode e) :message (.getMessage e)}))
-
 (defn message->map [#^Message m]
   (try
    {:body (.getBody m)}
