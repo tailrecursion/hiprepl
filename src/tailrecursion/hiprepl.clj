@@ -73,7 +73,7 @@
                          (catch Throwable t
                            (.getMessage t)))
                 mention (get (user-info token (get from "user_id")) "mention_name")]]
-    (println (format "%s ran %s, got %s" mention code-str return))
+    (println (format "%s ran %s, got %s\t%s" mention code-str return (java.util.Date.)))
     (future (send-result token room-name (format "@%s %s" mention return)))))
 
 (defn -main
@@ -83,8 +83,14 @@
         pool (mk-pool)]
     (add-watch messages ::eval #(eval-messages auth-token room-name (:eval %4)))
     (every 7000
-           #(send-off messages (fn [{:keys [prev]}]
-                                 (let [new (fetch-recent auth-token room-name)]
-                                   {:prev new
-                                    :eval (difference new prev)})))
+           #(do
+              (println "Polling...\t" (java.util.Date.))
+              (send-off messages (fn [{:keys [prev] :as old}]
+                                   (try
+                                     (let [new (fetch-recent auth-token room-name)]
+                                       {:prev new
+                                        :eval (difference new prev)})
+                                     (catch Throwable t
+                                       (println "Error" (.getMessage t) (java.util.Date.))
+                                       old)))))
            pool)))
