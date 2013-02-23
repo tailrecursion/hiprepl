@@ -1,6 +1,6 @@
 # hiprepl
 
-A Clojure REPL bot for [Atlassian HipChat](https://www.hipchat.com/).
+<img src="http://tailrecursion.com/~alan/pix/hiprepl.png" alt="hiprepl usage"/>
 
 ## Usage
 

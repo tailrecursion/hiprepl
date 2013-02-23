@@ -1,10 +1,10 @@
 (ns tailrecursion.hiprepl
   (:require [clojure.data.json :as json]
-            [clj-http.client :as client]
-            [clojure.set :as s]
-            [overtone.at-at :refer [mk-pool every]]
-            [clojail.core :refer [sandbox safe-read]]
-            [clojail.testers :refer [secure-tester]]))
+            [clj-http.client   :as client]
+            [clojure.set       :refer [difference]]
+            [overtone.at-at    :refer [mk-pool every]]
+            [clojail.core      :refer [sandbox safe-read]]
+            [clojail.testers   :refer [secure-tester]]))
 
 (def api-url "http://api.hipchat.com/v1")
 
@@ -69,8 +69,7 @@
           :let [code-str (.substring message 1)
                 return (try
                          (binding [*print-length* 30]
-                           (let [result (secure-sandbox (safe-read code-str))]
-                             (pr-str result)))
+                           (pr-str (secure-sandbox (safe-read code-str))))
                          (catch Throwable t
                            (.getMessage t)))
                 mention (get (user-info token (get from "user_id")) "mention_name")]]
@@ -87,5 +86,5 @@
            #(send-off messages (fn [{:keys [prev]}]
                                  (let [new (fetch-recent auth-token room-name)]
                                    {:prev new
-                                    :eval (s/difference new prev)})))
+                                    :eval (difference new prev)})))
            pool)))
