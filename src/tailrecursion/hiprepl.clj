@@ -63,8 +63,7 @@
 
 (defn -main
   [config-path]
-  (let [{:keys [username password rooms room-nickname]} (binding [*read-eval* false]
-                                                          (read-string (slurp config-path)))
+  (let [{:keys [username password rooms room-nickname]} (safe-read (slurp config-path))
         conn (connect username password)]
     (doseq [room rooms]
       (join conn room room-nickname eval-handler))
