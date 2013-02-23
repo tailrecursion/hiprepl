@@ -1,12 +1,10 @@
 (ns tailrecursion.hiprepl
-  (:require [clojail.core      :refer [sandbox safe-read]]
-            [clojail.testers   :refer [secure-tester]])
+  (:require [clojail.core    :refer [sandbox safe-read]]
+            [clojail.testers :refer [secure-tester]])
   (:import
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
    [org.jivesoftware.smack.packet Message Presence Presence$Type]
    [org.jivesoftware.smackx.muc MultiUserChat]))
-
-(def available-presence (Presence. Presence$Type/available))
 
 (defn packet-listener [conn processor]
   (proxy
@@ -39,7 +37,7 @@
       (.login conn username password)
       (catch XMPPException e
         (throw (Exception. "Couldn't log in with user's credentials."))))
-    (.sendPacket conn available-presence)
+    (.sendPacket conn (Presence. Presence$Type/available))
     conn))
 
 (defn join
