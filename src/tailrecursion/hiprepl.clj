@@ -46,7 +46,7 @@
     (.join muc room-nickname)
     (.addMessageListener muc
                          (packet-listener muc (with-message-map (wrap-responder handler))))
-    conn))
+    muc))
 
 (def secure-sandbox (sandbox secure-tester))
 
