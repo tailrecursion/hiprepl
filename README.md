@@ -1,6 +1,6 @@
 # hiprepl
 
-<img src="http://tailrecursion.com/~alan/pix/hiprepl_xmpp.png" alt="hiprepl usage"/>
+<img src="http://tailrecursion.com/~alan/pix/hiprepl_xmpp1-5.png" alt="hiprepl usage"/>
 
 ## Usage
 
