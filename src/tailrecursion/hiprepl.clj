@@ -7,10 +7,9 @@
    [org.jivesoftware.smackx.muc MultiUserChat]))
 
 (defn packet-listener [conn processor]
-  (proxy
-      [PacketListener]
-      []
-    (processPacket [packet] (processor conn packet))))
+  (reify PacketListener
+    (processPacket [_ packet]
+      (processor conn packet))))
 
 (defn message->map [#^Message m]
   (try
