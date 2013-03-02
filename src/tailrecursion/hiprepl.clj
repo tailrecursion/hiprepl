@@ -29,11 +29,11 @@
       (.sendMessage muc resp))))
 
 (defn connect
-  [username password]
+  [username password resource]
   (let [conn (XMPPConnection. (ConnectionConfiguration. "chat.hipchat.com" 5222))]
     (.connect conn)
     (try
-      (.login conn username password)
+      (.login conn username password resource)
       (catch XMPPException e
         (throw (Exception. "Couldn't log in with user's credentials."))))
     (.sendPacket conn (Presence. Presence$Type/available))
@@ -61,7 +61,7 @@
 (defn -main
   [config-path]
   (let [{:keys [username password rooms room-nickname]} (safe-read (slurp config-path))
-        conn (connect username password)]
+        conn (connect username password "bot")]
     (doseq [room rooms]
       (join conn room room-nickname eval-handler))
     @(promise)))
