@@ -3,7 +3,7 @@
   :url "https://github.com/tailrecursion/hiprepl"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.4.0"]
+  :dependencies [[org.clojure/clojure "1.5.0"]
                  [clojail "1.0.4"]
                  [jivesoftware/smack "3.1.0"]
                  [jivesoftware/smackx "3.1.0"]]
