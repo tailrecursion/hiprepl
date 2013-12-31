@@ -3,6 +3,7 @@
             [clojail.core    :refer [sandbox safe-read]]
             [clojail.testers :refer [secure-tester]])
   (:import
+   [java.io StringWriter]
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
    [org.jivesoftware.smack.packet Message Presence Presence$Type]
    [org.jivesoftware.smackx.muc MultiUserChat])
@@ -55,8 +56,12 @@
   [{:keys [body] :as msg}]
   (when (.startsWith body ",")
     (try
-      (binding [*print-length* 30]
-        (pr-str (secure-sandbox (safe-read (.substring body 1)))))
+      (let [output (StringWriter.)]
+        (secure-sandbox `(pr ~(safe-read (.substring body 1)))
+                        {#'*out* output
+                         #'*err* output
+                         #'*print-length* 30})
+        (.toString output))
       (catch Throwable t
         (.getMessage t)))))
 
