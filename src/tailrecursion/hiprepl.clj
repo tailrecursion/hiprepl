@@ -1,5 +1,6 @@
 (ns tailrecursion.hiprepl
-  (:require [clojail.core    :refer [sandbox safe-read]]
+  (:require [clojure.java.io :as io]
+            [clojail.core    :refer [sandbox safe-read]]
             [clojail.testers :refer [secure-tester]])
   (:import
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
@@ -59,8 +60,8 @@
         (.getMessage t)))))
 
 (defn -main
-  [config-path]
-  (let [{:keys [username password rooms room-nickname]} (safe-read (slurp config-path))
+  []
+  (let [{:keys [username password rooms room-nickname]} (safe-read (slurp (io/resource "config.clj")))
         conn (connect username password "bot")]
     (doseq [room rooms]
       (join conn room room-nickname eval-handler))
