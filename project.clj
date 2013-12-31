@@ -7,4 +7,6 @@
                  [clojail "1.0.4"]
                  [jivesoftware/smack "3.1.0"]
                  [jivesoftware/smackx "3.1.0"]]
+  :profiles {:uberjar {:aot :all}}
+  :target-path "target/%s/"
   :main tailrecursion.hiprepl)

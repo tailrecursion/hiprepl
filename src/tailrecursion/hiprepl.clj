@@ -4,7 +4,8 @@
   (:import
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
    [org.jivesoftware.smack.packet Message Presence Presence$Type]
-   [org.jivesoftware.smackx.muc MultiUserChat]))
+   [org.jivesoftware.smackx.muc MultiUserChat])
+  (:gen-class))
 
 (defn packet-listener [conn processor]
   (reify PacketListener
