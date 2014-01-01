@@ -52,7 +52,7 @@
 
 (def secure-sandbox (sandbox secure-tester))
 
-(defn eval-handler
+(defn message-handler
   [{:keys [body] :as msg}]
   (when (.startsWith body ",")
     (try
@@ -70,5 +70,5 @@
   (let [{:keys [username password rooms room-nickname]} (safe-read (slurp (io/resource "config.clj")))
         conn (connect username password "bot")]
     (doseq [room rooms]
-      (join conn room room-nickname eval-handler))
+      (join conn room room-nickname message-handler))
     @(promise)))
