@@ -1,5 +1,6 @@
 (ns tailrecursion.hiprepl
   (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [clojail.core    :refer [sandbox safe-read]]
             [clojail.testers :refer [secure-tester]])
   (:import
@@ -16,8 +17,9 @@
 
 (defn message->map [#^Message m]
   (try
-   {:body (.getBody m)}
-   (catch Exception e (println e) {})))
+    {:body (.getBody m)
+     :from (.getFrom m)}
+    (catch Exception e (println e) {})))
 
 (defn with-message-map [handler]
   (fn [muc packet]
@@ -53,22 +55,25 @@
 (def secure-sandbox (sandbox secure-tester))
 
 (defn message-handler
-  [{:keys [body] :as msg}]
-  (when (.startsWith body ",")
-    (try
-      (let [output (StringWriter.)]
-        (secure-sandbox `(pr ~(safe-read (.substring body 1)))
-                        {#'*out* output
-                         #'*err* output
-                         #'*print-length* 30})
-        (.toString output))
-      (catch Throwable t
-        (.getMessage t)))))
+  [nickname]
+  (fn [{:keys [body from] :as msg}]
+    (when (and (not= nickname
+                     (string/replace (or from "") #"^[^/]*/" ""))
+               (.startsWith body ","))
+      (try
+        (let [output (StringWriter.)]
+          (secure-sandbox `(pr ~(safe-read (.substring body 1)))
+                          {#'*out* output
+                           #'*err* output
+                           #'*print-length* 30})
+          (.toString output))
+        (catch Throwable t
+          (.getMessage t))))))
 
 (defn -main
   []
   (let [{:keys [username password rooms room-nickname]} (safe-read (slurp (io/resource "config.clj")))
         conn (connect username password "bot")]
     (doseq [room rooms]
-      (join conn room room-nickname message-handler))
+      (join conn room room-nickname (message-handler room-nickname)))
     @(promise)))
