@@ -3,7 +3,8 @@
             [tailrecursion.hiprepl :refer :all]))
 
 (deftest message-handler-test
-  (let [handler (message-handler "I Robot")]
+  (let [handler (message-handler '{:room-nickname "I Robot"
+                                   :sandbox clojail.testers/secure-tester})]
     (testing "evaluates messages starting with ','"
       (is (= "4" (handler {:body ",(+ 2 2)"}))))
     (testing "limits the number of elements printed"
