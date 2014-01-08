@@ -52,28 +52,34 @@
                          (packet-listener muc (with-message-map (wrap-responder handler))))
     muc))
 
-(def secure-sandbox (sandbox secure-tester))
+(defn make-safe-eval
+  [{sandbox-config :sandbox}]
+  (let [our-sandbox (sandbox (deref (find-var sandbox-config)))]
+    (fn [form bindings]
+      (our-sandbox `(pr ~form)
+                   (merge {#'*print-length* 30}
+                          bindings)))))
 
 (defn message-handler
-  [nickname]
-  (fn [{:keys [body from] :as msg}]
-    (when (and (not= nickname
-                     (string/replace (or from "") #"^[^/]*/" ""))
-               (.startsWith body ","))
-      (try
-        (let [output (StringWriter.)]
-          (secure-sandbox `(pr ~(safe-read (.substring body 1)))
-                          {#'*out* output
-                           #'*err* output
-                           #'*print-length* 30})
-          (.toString output))
-        (catch Throwable t
-          (.getMessage t))))))
+  [{nickname :room-nickname :as config}]
+  (let [safe-eval (make-safe-eval config)]
+    (fn [{:keys [body from]}]
+      (when (and (not= nickname
+                       (string/replace (or from "") #"^[^/]*/" ""))
+                 (.startsWith body ","))
+        (try
+          (let [output (StringWriter.)]
+            (safe-eval (safe-read (.substring body 1))
+                       {#'*out* output
+                        #'*err* output})
+            (.toString output))
+          (catch Throwable t
+            (.getMessage t)))))))
 
 (defn -main
   []
-  (let [{:keys [username password rooms room-nickname]} (safe-read (slurp (io/resource "config.clj")))
+  (let [{:keys [username password rooms room-nickname] :as config} (safe-read (slurp (io/resource "config.clj")))
         conn (connect username password "bot")]
     (doseq [room rooms]
-      (join conn room room-nickname (message-handler room-nickname)))
+      (join conn room room-nickname (message-handler config)))
     @(promise)))
