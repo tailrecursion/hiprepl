@@ -56,15 +56,16 @@
   [{sandbox-config :sandbox}]
   (let [our-sandbox (sandbox (deref (find-var sandbox-config)))
         history (atom [nil nil nil])]
-    (fn [form bindings]
-      (let [result (our-sandbox form
-                                (merge {#'*print-length* 30
-                                        #'*1 (nth @history 0)
-                                        #'*2 (nth @history 1)
-                                        #'*3 (nth @history 2)}
-                                       bindings))]
+    (fn [form output]
+      (let [bindings {#'*print-length* 30
+                      #'*1 (nth @history 0)
+                      #'*2 (nth @history 1)
+                      #'*3 (nth @history 2)
+                      #'*out* output
+                      #'*err* output}
+            result (our-sandbox form bindings)]
         (swap! history (constantly [result (nth @history 0) (nth @history 1)]))
-        (binding [*out* (get bindings #'*out*)]
+        (binding [*out* output]
           (pr result))))))
 
 (defn message-handler
@@ -76,9 +77,7 @@
                  (.startsWith body ","))
         (try
           (let [output (StringWriter.)]
-            (safe-eval (safe-read (.substring body 1))
-                       {#'*out* output
-                        #'*err* output})
+            (safe-eval (safe-read (.substring body 1)) output)
             (.toString output))
           (catch Throwable t
             (.getMessage t)))))))
