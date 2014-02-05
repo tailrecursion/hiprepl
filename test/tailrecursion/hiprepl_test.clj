@@ -15,4 +15,17 @@
       (is (= "Hello\nnil" (handler {:body ",(println \"Hello\")"}))))
     (testing "does not evaluate its own output"
       (is (nil? (handler {:body ",(+ 2 2)",
-                          :from "9645_Foo@conf.hipchat.com/I Robot"}))))))
+                          :from "9645_Foo@conf.hipchat.com/I Robot"}))))
+    (testing "history"
+      (testing "sets *1 to the last result"
+        (handler {:body ",42"})
+        (is (= "42" (handler {:body ",*1"}))))
+      (testing "sets *2 to the second last result"
+        (handler {:body ",69"})
+        (handler {:body ",42"})
+        (is (= "69" (handler {:body ",*2"}))))
+      (testing "sets *3 to the third last result"
+        (handler {:body ",87"})
+        (handler {:body ",69"})
+        (handler {:body ",42"})
+        (is (= "87" (handler {:body ",*3"})))))))

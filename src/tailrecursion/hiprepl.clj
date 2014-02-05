@@ -54,11 +54,18 @@
 
 (defn make-safe-eval
   [{sandbox-config :sandbox}]
-  (let [our-sandbox (sandbox (deref (find-var sandbox-config)))]
+  (let [our-sandbox (sandbox (deref (find-var sandbox-config)))
+        history (atom [nil nil nil])]
     (fn [form bindings]
-      (our-sandbox `(pr ~form)
-                   (merge {#'*print-length* 30}
-                          bindings)))))
+      (let [result (our-sandbox form
+                                (merge {#'*print-length* 30
+                                        #'*1 (nth @history 0)
+                                        #'*2 (nth @history 1)
+                                        #'*3 (nth @history 2)}
+                                       bindings))]
+        (swap! history (constantly [result (nth @history 0) (nth @history 1)]))
+        (binding [*out* (get bindings #'*out*)]
+          (pr result))))))
 
 (defn message-handler
   [{nickname :room-nickname :as config}]
