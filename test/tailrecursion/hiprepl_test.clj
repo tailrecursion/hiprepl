@@ -28,4 +28,7 @@
         (handler {:body ",87"})
         (handler {:body ",69"})
         (handler {:body ",42"})
-        (is (= "87" (handler {:body ",*3"})))))))
+        (is (= "87" (handler {:body ",*3"}))))
+      (testing "sets *e to the last exception"
+        (handler {:body ",(/ 1 0)"})
+        (is (= "java.lang.ArithmeticException" (handler {:body ",(type *e)"})))))))

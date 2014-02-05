@@ -4,6 +4,7 @@
             [clojail.core    :refer [sandbox safe-read]]
             [clojail.testers :refer [secure-tester]])
   (:import
+   [java.util.concurrent ExecutionException]
    [java.io StringWriter]
    [org.jivesoftware.smack ConnectionConfiguration XMPPConnection XMPPException PacketListener]
    [org.jivesoftware.smack.packet Message Presence Presence$Type]
@@ -52,21 +53,45 @@
                          (packet-listener muc (with-message-map (wrap-responder handler))))
     muc))
 
+#_(let [history (atom [nil nil nil])
+      last-exception (atom nil)]
+  (try
+    (let [bindings {#'*print-length* 30
+                    #'*1 (nth @history 0)
+                    #'*2 (nth @history 1)
+                    #'*3 (nth @history 2)
+                    #'*e @last-exception}
+          result (/ 1 0)]
+      (swap! history (constantly [result (nth @history 0) (nth @history 1)]))
+      (pr result))
+    (catch Throwable t
+      (swap! last-exception (constantly t))
+      (print (.getMessage t)))))
+
 (defn make-safe-eval
   [{sandbox-config :sandbox}]
-  (let [our-sandbox (sandbox (deref (find-var sandbox-config)))
-        history (atom [nil nil nil])]
+  (let [our-sandbox (sandbox @(find-var sandbox-config))
+        history (atom [nil nil nil])
+        last-exception (atom nil)]
     (fn [form output]
-      (let [bindings {#'*print-length* 30
-                      #'*1 (nth @history 0)
-                      #'*2 (nth @history 1)
-                      #'*3 (nth @history 2)
-                      #'*out* output
-                      #'*err* output}
-            result (our-sandbox form bindings)]
-        (swap! history (constantly [result (nth @history 0) (nth @history 1)]))
-        (binding [*out* output]
-          (pr result))))))
+      (binding [*out* output]
+        (try
+          (let [bindings {#'*print-length* 30
+                          #'*1 (nth @history 0)
+                          #'*2 (nth @history 1)
+                          #'*3 (nth @history 2)
+                          #'*e @last-exception
+                          #'*out* output
+                          #'*err* output}
+                result (our-sandbox form bindings)]
+            (swap! history (constantly [result (nth @history 0) (nth @history 1)]))
+            (pr result))
+          (catch ExecutionException e
+            (swap! last-exception (constantly (.getCause e)))
+            (print (.getMessage e)))
+          (catch Throwable t
+            (swap! last-exception (constantly t))
+            (print (.getMessage t))))))))
 
 (defn message-handler
   [{nickname :room-nickname :as config}]
@@ -75,12 +100,9 @@
       (when (and (not= nickname
                        (string/replace (or from "") #"^[^/]*/" ""))
                  (.startsWith body ","))
-        (try
-          (let [output (StringWriter.)]
-            (safe-eval (safe-read (.substring body 1)) output)
-            (.toString output))
-          (catch Throwable t
-            (.getMessage t)))))))
+        (let [output (StringWriter.)]
+          (safe-eval (safe-read (.substring body 1)) output)
+          (.toString output))))))
 
 (defn -main
   []
